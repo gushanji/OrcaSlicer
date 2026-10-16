@@ -256,6 +256,7 @@ UpdateVersionDialog::UpdateVersionDialog(wxWindow *parent)
 {
     std::string icon_path = (boost::format("%1%/images/Snapmaker_OrcaTitle.ico") % resources_dir()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
+    BOOST_LOG_TRIVIAL(warning) << "[VDIAG] UpdateVersionDialog ctor, parent=" << (void*)parent;
 
     SetBackgroundColour(*wxWHITE);
 
@@ -335,6 +336,7 @@ UpdateVersionDialog::UpdateVersionDialog(wxWindow *parent)
     m_button_download->SetCursor(wxCURSOR_HAND);
 
     m_button_download->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent &e) {
+        BOOST_LOG_TRIVIAL(warning) << "[VDIAG] download clicked, isModal=" << isModal;
         wxCommandEvent event(EVT_DOWN_URL_PACK);
 
         wxPostEvent(this, event);
@@ -353,7 +355,8 @@ UpdateVersionDialog::UpdateVersionDialog(wxWindow *parent)
     m_button_skip_version->SetCornerRadius(FromDIP(12));
     m_button_skip_version->SetCursor(wxCURSOR_HAND);
 
-    m_button_skip_version->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent &e) { 
+    m_button_skip_version->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent &e) {
+        BOOST_LOG_TRIVIAL(warning) << "[VDIAG] skip clicked, isModal=" << isModal;
         wxGetApp().set_skip_version(true);
         if (isModal)
             EndModal(wxID_NO);
@@ -388,6 +391,7 @@ UpdateVersionDialog::UpdateVersionDialog(wxWindow *parent)
     m_button_cancel->SetCursor(wxCURSOR_HAND);
 
     m_button_cancel->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent &e) {
+        BOOST_LOG_TRIVIAL(warning) << "[VDIAG] cancel clicked, isModal=" << isModal;
         if (isModal)
             EndModal(wxID_NO);
         else
@@ -525,6 +529,7 @@ std::vector<std::string> UpdateVersionDialog::splitWithStl(std::string str,std::
 
 void UpdateVersionDialog::update_version_info(wxString release_note, wxString version)
 {
+    BOOST_LOG_TRIVIAL(warning) << "[VDIAG] update_version_info, note_len=" << release_note.length() << " version=" << version.ToUTF8().data();
     //bbs check whether the web display is used
     bool use_web_link = false;
     url_line          = "";

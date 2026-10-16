@@ -2232,7 +2232,8 @@ void GUI_App::init_app_config()
 #if !BBL_RELEASE_TO_PUBLIC
     set_log_path_and_level(log_filename, 5);
 #else
-    set_log_path_and_level(log_filename, 3);
+    // [VDIAG] diag branch: raise public-build log level 3->5 for the mac update-dialog diagnosis
+    set_log_path_and_level(log_filename, 5);
 #endif
 
     //BBS: remove GCodeViewer as seperate APP logic
@@ -2838,6 +2839,7 @@ bool GUI_App::on_init_inner()
                     if (evt.GetInt() != 0) {
                         m_updateDialog->m_button_skip_version->Hide();
                     }
+                    BOOST_LOG_TRIVIAL(warning) << "[VDIAG] showing update dialog, version=" << version_info.version_str << " by_user=" << evt.GetInt();
                     m_updateDialog->Raise();
                     m_updateDialog->Show();
                     m_updateDialog->setUrl(version_info.url);
@@ -3179,6 +3181,21 @@ bool GUI_App::on_init_inner()
 
     snap::SnapLogClient::instance().init(std::move(deps), std::move(snap_cfg));
     BOOST_LOG_TRIVIAL(info) << "SnapLogClient initialized";
+
+    // [VDIAG] force-trigger the update dialog for the mac diagnosis (diag branch only).
+    // Toggle without rebuild: create/remove the marker file ~/Desktop/VDIAG_FORCE.
+    CallAfter([this]() {
+        wxString marker = wxFileName::GetHomeDir() + "/Desktop/VDIAG_FORCE";
+        if (!wxFileExists(marker))
+            return;
+        version_info.version_str = "9.9.9.9";
+        version_info.description = "VDIAG test release note.";
+        version_info.url         = "https://www.snapmaker.com";
+        wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
+        evt->SetInt(0); // silent-check style: keeps the "Skip this Version" button visible
+        QueueEvent(evt);
+        BOOST_LOG_TRIVIAL(warning) << "[VDIAG] force trigger posted (marker file found)";
+    });
 
     profiler.mark("on_init_inner return");
 
