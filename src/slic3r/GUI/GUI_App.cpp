@@ -3183,18 +3183,39 @@ bool GUI_App::on_init_inner()
     BOOST_LOG_TRIVIAL(info) << "SnapLogClient initialized";
 
     // [VDIAG] force-trigger the update dialog for the mac diagnosis (diag branch only).
-    // Toggle without rebuild: create/remove the marker file ~/Desktop/VDIAG_FORCE.
+    // Toggle without rebuild via marker file ~/Desktop/VDIAG_FORCE:
+    //   file absent        -> disabled
+    //   file empty or "0"  -> silent-check style (by_user=0, Skip button visible)
+    //   file with "1"      -> menu-check style (by_user=1, Skip hidden) — matches the bug video
     CallAfter([this]() {
         wxString marker = wxFileName::GetHomeDir() + "/Desktop/VDIAG_FORCE";
         if (!wxFileExists(marker))
             return;
+        int by_user = 0;
+        {
+            wxFileInputStream input(marker);
+            if (input.IsOk()) {
+                wxTextInputStream text(input, "\n", wxConvUTF8);
+                wxString mode = text.ReadLine().Trim(true).Trim(false);
+                if (mode == "1")
+                    by_user = 1;
+            }
+        }
         version_info.version_str = "9.9.9.9";
-        version_info.description = "VDIAG test release note.";
+        version_info.description =
+            "What's new in VDIAG test build 9.9.9.9:\n"
+            "1. New calibration flow for multi-material prints with automatic flush volume calculation.\n"
+            "2. Improved tree support generation performance on large models (up to 30% faster).\n"
+            "3. Fixed an issue where the slicing progress popup could disappear after reconnecting a printer.\n"
+            "4. Fixed an issue where filament slots could desync after swapping AMS trays mid-print.\n"
+            "5. Updated bundled printer profiles and added new material presets for high-temperature filaments.\n"
+            "6. Various UI polish: dark mode contrast fixes, updated icons, and smoother camera controls in the 3D view.\n"
+            "7. Reduced memory usage when loading very large 3MF projects with embedded textures.";
         version_info.url         = "https://www.snapmaker.com";
         wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
-        evt->SetInt(0); // silent-check style: keeps the "Skip this Version" button visible
+        evt->SetInt(by_user);
         QueueEvent(evt);
-        BOOST_LOG_TRIVIAL(warning) << "[VDIAG] force trigger posted (marker file found)";
+        BOOST_LOG_TRIVIAL(warning) << "[VDIAG] force trigger posted (marker file found, by_user=" << by_user << ")";
     });
 
     profiler.mark("on_init_inner return");
