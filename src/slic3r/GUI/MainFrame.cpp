@@ -499,6 +499,12 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     // declare events
     Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& event) {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< ": mainframe received close_widow event";
+        // Session end: no interaction, no teardown - wx deletes all windows under us
+        // (Sentry 7266288009 / 7154986484, see GUI_App QUERY_END_SESSION).
+        if (wxGetApp().in_session_end()) {
+            event.Skip();
+            return;
+        }
         // A modal dialog is still running its nested event loop: destroying the
         // main frame now tears it down mid-loop and crashes in DestroyChildren
         // (Sentry 7266288009 / 7154986484). Veto until the dialog is dismissed.
@@ -855,6 +861,13 @@ WXLRESULT MainFrame::MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam
         AdjustWorkingAreaForAutoHide(hWnd, mmi);
         return 0;
     }
+    case WM_ENDSESSION:
+        // wx ignores the wParam=0 "session cancelled" broadcast; without this
+        // reset the session-end guards would silently discard unsaved changes
+        // on every later manual close.
+        if (wParam == 0)
+            wxGetApp().reset_session_end();
+        break;
     case WM_WTSSESSION_CHANGE: {
         switch (wParam) {
         case WTS_SESSION_LOCK:

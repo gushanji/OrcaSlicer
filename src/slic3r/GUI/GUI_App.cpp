@@ -2506,6 +2506,22 @@ bool GUI_App::on_init_inner()
     CBaseException::set_log_folder(data_dir());
 #endif
 
+#ifdef __WINDOWS__
+    m_session_end_reset_timer.SetOwner(this);
+    Bind(wxEVT_TIMER, [this](wxTimerEvent&) { reset_session_end(); }, m_session_end_reset_timer.GetId());
+
+    // wxApp::OnEndSession deletes all top-level windows under open modal dialogs
+    // and corrupts the heap (Sentry 7266288009 / 7154986484). Mark the session
+    // end, dismiss modal dialogs without prompting, and skip wx's window teardown
+    // on the final END_SESSION message.
+    wxGetApp().Bind(wxEVT_QUERY_END_SESSION, [this](wxCloseEvent&) {
+        m_in_session_end = true;
+        GUI::abort_all_modal_dialogs();
+        m_session_end_reset_timer.StartOnce(60000);
+    });
+
+    wxGetApp().Bind(wxEVT_END_SESSION, [this](wxCloseEvent&) { ::ExitProcess(0); });
+#else
     wxGetApp().Bind(wxEVT_QUERY_END_SESSION, [this](auto & e) {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< "received wxEVT_QUERY_END_SESSION";
         if (mainframe) {
@@ -2520,6 +2536,7 @@ bool GUI_App::on_init_inner()
         for (auto d : dialogStack)
             d->EndModal(wxID_ABORT);
     });
+#endif
 
     // Verify resources path
     const wxString resources_dir = from_u8(Slic3r::resources_dir());
@@ -3059,6 +3076,12 @@ bool GUI_App::on_init_inner()
     profiler.mark("on_init_inner return");
 
     return true;
+}
+
+void GUI_App::reset_session_end()
+{
+    m_session_end_reset_timer.Stop();
+    m_in_session_end = false;
 }
 
 void GUI_App::copy_network_if_available()
@@ -6598,6 +6621,9 @@ std::vector<std::pair<unsigned int, std::string>> GUI_App::get_selected_presets(
 // - Taking snapshot
 bool GUI_App::check_and_save_current_preset_changes(const wxString& caption, const wxString& header, bool remember_choice/* = true*/, bool dont_save_insted_of_discard/* = false*/)
 {
+    if (m_in_session_end)
+        return true;
+
     if (has_current_preset_changes()) {
         int act_buttons = ActionButtons::SAVE;
         if (dont_save_insted_of_discard)
@@ -6730,6 +6756,9 @@ bool GUI_App::can_load_project()
 
 bool GUI_App::check_print_host_queue()
 {
+    if (m_in_session_end)
+        return true;
+
     wxString dirty;
     std::vector<std::pair<std::string, std::string>> jobs;
     // Get ongoing jobs from dialog
